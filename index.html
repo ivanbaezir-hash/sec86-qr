@@ -4,353 +4,159 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Control de Acceso SEC 86</title>
-
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <style>
-body{
-    margin:0;
-    font-family:Arial,sans-serif;
-    background:#f1f3f5;
-    text-align:center;
-}
-header{
-    background:#173a5e;
-    color:white;
-    padding:18px 10px;
-}
-header h1{
-    margin:0;
-    font-size:23px;
-}
-header p{
-    margin:5px;
-}
-main{
-    max-width:500px;
-    margin:auto;
-    padding:15px;
-}
-.tarjeta{
-    background:white;
-    padding:15px;
-    border-radius:14px;
-    margin-bottom:15px;
-    box-shadow:0 2px 8px #bbb;
-}
-select,button{
-    width:100%;
-    padding:14px;
-    font-size:17px;
-    margin-top:8px;
-    border-radius:8px;
-}
-button{
-    background:#173a5e;
-    color:white;
-    border:0;
-    font-weight:bold;
-}
-#resultado{
-    display:none;
-    padding:20px;
-    border-radius:14px;
-    margin-top:15px;
-}
-.ok{
-    background:#dcfce7;
-    border:3px solid #16a34a;
-}
-.retardo{
-    background:#fef3c7;
-    border:3px solid #d97706;
-}
-.duplicado{
-    background:#ffedd5;
-    border:3px solid #ea580c;
-}
-.error{
-    background:#fee2e2;
-    border:3px solid #dc2626;
-}
-#icono{
-    font-size:50px;
-}
-#alumno{
-    font-size:22px;
-    font-weight:bold;
-    margin-top:10px;
-}
-#grupo,#hora{
-    font-size:24px;
-    margin-top:7px;
-}
-#estado{
-    font-size:18px;
-    font-weight:bold;
-    margin-top:8px;
-}
+body{margin:0;font-family:Arial,sans-serif;background:#f1f3f5;text-align:center}
+header{background:#173a5e;color:white;padding:18px 10px}
+header h1{margin:0;font-size:23px} header p{margin:5px}
+main{max-width:500px;margin:auto;padding:15px}
+.tarjeta{background:white;padding:15px;border-radius:14px;margin-bottom:15px;box-shadow:0 2px 8px #bbb}
+select,button{width:100%;padding:14px;font-size:17px;margin-top:8px;border-radius:8px}
+button{background:#173a5e;color:white;border:0;font-weight:bold}
+#resultado{display:none;padding:20px;border-radius:14px;margin-top:15px}
+.ok{background:#dcfce7;border:3px solid #16a34a}
+.retardo{background:#fef3c7;border:3px solid #d97706}
+.duplicado{background:#ffedd5;border:3px solid #ea580c}
+.error{background:#fee2e2;border:3px solid #dc2626}
+#icono{font-size:50px}
+#alumno{font-size:25px;font-weight:bold;margin-top:10px}
+#grupo,#hora{font-size:26px;margin-top:7px}
+#estado{font-size:20px;font-weight:bold;margin-top:8px}
+#contador{font-size:18px;font-weight:bold;margin-top:10px;color:#173a5e}
 </style>
 </head>
-
 <body>
-
 <header>
 <h1>SECUNDARIA No. 86</h1>
 <p>“República de Venezuela”</p>
 <p>Turno Vespertino</p>
 <p><b>CONTROL DE ACCESO</b></p>
 </header>
-
 <main>
-
 <div class="tarjeta">
-
 <label><b>Punto de acceso</b></label>
-
 <select id="dispositivo">
 <option value="ACCESO-1">ACCESO 1</option>
 <option value="ACCESO-2">ACCESO 2</option>
 <option value="ACCESO-3">ACCESO 3</option>
 </select>
-
-<button id="boton" onclick="iniciar()">
-📷 ACTIVAR LECTOR QR
-</button>
-
-<p id="mensajeCamara">
-Cámara desactivada
-</p>
-
+<button id="boton" onclick="iniciar()">📷 ACTIVAR LECTOR QR</button>
+<p id="mensajeCamara">Cámara desactivada</p>
+<div id="contador">REGISTROS DE ESTA SESIÓN: 0</div>
 </div>
-
-<div class="tarjeta">
-<div id="reader"></div>
-</div>
-
+<div class="tarjeta"><div id="reader"></div></div>
 <div id="resultado">
-
-<div id="icono"></div>
-<h2 id="mensaje"></h2>
-<div id="alumno"></div>
-<div id="grupo"></div>
-<div id="hora"></div>
-<div id="estado"></div>
-
+<div id="icono"></div><h2 id="mensaje"></h2>
+<div id="alumno"></div><div id="grupo"></div><div id="hora"></div><div id="estado"></div>
 </div>
-
 </main>
-
 <script>
+const SERVIDOR="https://script.google.com/macros/s/AKfycby1IdSim5ZDH8FemOvOid5_iitSYdANJUXvpOZJ0QKwjF-0E1yEDWrH7F6Uc4QibWxN/exec";
 
-/* ========================================
-   PEGA AQUÍ LA URL /exec DE APPS SCRIPT
-======================================== */
+let scanner, procesando=false, ultimo="", ultimoTiempo=0, contador=0;
+let audioCtx=null;
 
-const SERVIDOR = "https://script.google.com/macros/s/AKfycby1IdSim5ZDH8FemOvOid5_iitSYdANJUXvpOZJ0QKwjF-0E1yEDWrH7F6Uc4QibWxN/exec";
-
-
-let scanner;
-let procesando=false;
-let ultimo="";
-let ultimoTiempo=0;
-
+function prepararAudio(){
+  try{
+    audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+  }catch(e){}
+}
+function tono(freq,duracion,inicio=0){
+  if(!audioCtx) return;
+  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+  o.frequency.value=freq; o.type="sine";
+  g.gain.setValueAtTime(0.12,audioCtx.currentTime+inicio);
+  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+inicio+duracion);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(audioCtx.currentTime+inicio); o.stop(audioCtx.currentTime+inicio+duracion);
+}
+function sonidoOk(){tono(1050,.11);tono(1450,.12,.13)}
+function sonidoDuplicado(){tono(700,.16);tono(700,.16,.20)}
+function sonidoError(){tono(260,.22);tono(190,.28,.25)}
 
 async function iniciar(){
-
-    document.getElementById("boton").disabled=true;
-
-    document.getElementById("mensajeCamara").innerText=
-        "Solicitando acceso a la cámara...";
-
-    scanner=new Html5Qrcode("reader");
-
-    try{
-
-        await scanner.start(
-            {facingMode:"environment"},
-            {
-                fps:12,
-                qrbox:{width:250,height:250}
-            },
-            qrDetectado
-        );
-
-        document.getElementById("boton").style.display="none";
-
-        document.getElementById("mensajeCamara").innerText=
-            "🟢 LECTOR ACTIVO — ACERQUE LA CREDENCIAL";
-
-    }catch(error){
-
-        document.getElementById("boton").disabled=false;
-
-        document.getElementById("mensajeCamara").innerText=
-            "No fue posible activar la cámara";
-
-        alert(error);
-    }
+  prepararAudio();
+  document.getElementById("boton").disabled=true;
+  document.getElementById("mensajeCamara").innerText="Solicitando acceso a la cámara...";
+  scanner=new Html5Qrcode("reader");
+  try{
+    await scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:250,height:250}},qrDetectado);
+    document.getElementById("boton").style.display="none";
+    document.getElementById("mensajeCamara").innerText="🟢 LECTOR ACTIVO — ACERQUE LA CREDENCIAL";
+  }catch(error){
+    document.getElementById("boton").disabled=false;
+    document.getElementById("mensajeCamara").innerText="No fue posible activar la cámara";
+    alert(error);
+  }
 }
-
-
 function qrDetectado(codigo){
-
-    codigo=codigo.trim();
-
-    if(procesando) return;
-
-    const ahora=Date.now();
-
-    if(codigo===ultimo && ahora-ultimoTiempo<5000){
-        return;
-    }
-
-    ultimo=codigo;
-    ultimoTiempo=ahora;
-    procesando=true;
-
-    document.getElementById("mensajeCamara").innerText=
-        "Consultando credencial...";
-
-    consultar(codigo);
+  codigo=codigo.trim();
+  if(procesando) return;
+  const ahora=Date.now();
+  if(codigo===ultimo && ahora-ultimoTiempo<5000) return;
+  ultimo=codigo; ultimoTiempo=ahora; procesando=true;
+  document.getElementById("mensajeCamara").innerText="Consultando credencial...";
+  consultar(codigo);
 }
-
-
 function consultar(codigo){
+  const dispositivo=document.getElementById("dispositivo").value;
+  const callback="cb_"+Date.now()+"_"+Math.floor(Math.random()*10000);
+  const script=document.createElement("script");
+  let terminado=false;
+  const timeout=setTimeout(function(){
+    if(terminado)return; terminado=true;
+    try{delete window[callback]}catch(e){}
+    script.remove();
+    mostrar({ok:false,tipo:"ERROR",mensaje:"SIN RESPUESTA DEL SERVIDOR"});
+  },8000);
 
-    const dispositivo=
-        document.getElementById("dispositivo").value;
-
-    const callback=
-        "cb_"+Date.now();
-
-    const script=
-        document.createElement("script");
-
-
-    window[callback]=function(datos){
-
-        mostrar(datos);
-
-        delete window[callback];
-
-        script.remove();
-    };
-
-
-    script.src=
-        SERVIDOR+
-        "?action=scan"+
-        "&id="+encodeURIComponent(codigo)+
-        "&dispositivo="+encodeURIComponent(dispositivo)+
-        "&callback="+callback;
-
-
-    script.onerror=function(){
-
-        mostrar({
-            ok:false,
-            tipo:"ERROR",
-            mensaje:"ERROR DE COMUNICACIÓN"
-        });
-
-        script.remove();
-    };
-
-
-    document.body.appendChild(script);
+  window[callback]=function(datos){
+    if(terminado)return; terminado=true; clearTimeout(timeout);
+    mostrar(datos); delete window[callback]; script.remove();
+  };
+  script.src=SERVIDOR+"?action=scan&id="+encodeURIComponent(codigo)+"&dispositivo="+encodeURIComponent(dispositivo)+"&callback="+callback;
+  script.onerror=function(){
+    if(terminado)return; terminado=true; clearTimeout(timeout);
+    try{delete window[callback]}catch(e){}
+    mostrar({ok:false,tipo:"ERROR",mensaje:"ERROR DE COMUNICACIÓN"}); script.remove();
+  };
+  document.body.appendChild(script);
 }
-
-
 function mostrar(datos){
+  const caja=document.getElementById("resultado");
+  caja.style.display="block"; caja.className="";
+  document.getElementById("alumno").innerText=datos.alumno||"";
+  document.getElementById("grupo").innerText=datos.grupo?"GRUPO "+datos.grupo:"";
+  document.getElementById("hora").innerText=datos.hora||"";
+  document.getElementById("estado").innerText=datos.estado||"";
 
-    const caja=document.getElementById("resultado");
-
-    caja.style.display="block";
-    caja.className="";
-
-    document.getElementById("alumno").innerText=
-        datos.alumno || "";
-
-    document.getElementById("grupo").innerText=
-        datos.grupo ? "GRUPO "+datos.grupo : "";
-
-    document.getElementById("hora").innerText=
-        datos.hora || "";
-
-    document.getElementById("estado").innerText=
-        datos.estado || "";
-
-
-    if(datos.ok){
-
-        if(datos.estado==="RETARDO"){
-
-            caja.className="retardo";
-
-            document.getElementById("icono").innerText="🟡";
-
-        }else{
-
-            caja.className="ok";
-
-            document.getElementById("icono").innerText="✅";
-        }
-
-        document.getElementById("mensaje").innerText=
-            "ENTRADA REGISTRADA";
-
-        vibrar([100,50,100]);
-
+  if(datos.ok){
+    contador++;
+    document.getElementById("contador").innerText="REGISTROS DE ESTA SESIÓN: "+contador;
+    if(datos.estado==="RETARDO"){
+      caja.className="retardo"; document.getElementById("icono").innerText="🟡";
+    }else{
+      caja.className="ok"; document.getElementById("icono").innerText="✅";
     }
-
-    else if(datos.tipo==="DUPLICADO"){
-
-        caja.className="duplicado";
-
-        document.getElementById("icono").innerText="⚠️";
-
-        document.getElementById("mensaje").innerText=
-            "ENTRADA YA REGISTRADA";
-
-        vibrar([200]);
-
-    }
-
-    else{
-
-        caja.className="error";
-
-        document.getElementById("icono").innerText="❌";
-
-        document.getElementById("mensaje").innerText=
-            datos.mensaje || "CREDENCIAL NO RECONOCIDA";
-
-        vibrar([300,100,300]);
-    }
-
-
-    setTimeout(function(){
-
-        caja.style.display="none";
-
-        document.getElementById("mensajeCamara").innerText=
-            "🟢 LECTOR ACTIVO — ACERQUE LA CREDENCIAL";
-
-        procesando=false;
-
-    },2500);
+    document.getElementById("mensaje").innerText="ENTRADA REGISTRADA";
+    sonidoOk(); vibrar([80]);
+  }else if(datos.tipo==="DUPLICADO"){
+    caja.className="duplicado"; document.getElementById("icono").innerText="⚠️";
+    document.getElementById("mensaje").innerText="ENTRADA YA REGISTRADA";
+    sonidoDuplicado(); vibrar([160,70,160]);
+  }else{
+    caja.className="error"; document.getElementById("icono").innerText="❌";
+    document.getElementById("mensaje").innerText=datos.mensaje||"CREDENCIAL NO RECONOCIDA";
+    sonidoError(); vibrar([250,80,250]);
+  }
+  setTimeout(function(){
+    caja.style.display="none";
+    document.getElementById("mensajeCamara").innerText="🟢 LECTOR ACTIVO — ACERQUE LA CREDENCIAL";
+    procesando=false;
+  },1400);
 }
-
-
-function vibrar(patron){
-
-    if(navigator.vibrate){
-        navigator.vibrate(patron);
-    }
-}
-
+function vibrar(patron){if(navigator.vibrate)navigator.vibrate(patron)}
 </script>
-
 </body>
 </html>
