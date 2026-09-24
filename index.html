@@ -36,12 +36,7 @@ button{background:#173a5e;color:white;border:0;font-weight:bold}
 </header>
 <main>
 <div class="tarjeta">
-<label><b>Punto de acceso</b></label>
-<select id="dispositivo">
-<option value="ACCESO-1">ACCESO 1</option>
-<option value="ACCESO-2">ACCESO 2</option>
-<option value="ACCESO-3">ACCESO 3</option>
-</select>
+<div><b>LECTOR:</b> <span id="idLector">Asignando...</span></div>
 <button id="boton" onclick="iniciar()">📷 ACTIVAR LECTOR QR</button>
 <p id="mensajeCamara">Cámara desactivada</p>
 <div id="contador">REGISTROS DE ESTA SESIÓN: 0</div>
@@ -84,6 +79,25 @@ function sonidoOk(){tono(950,.13,0,.30);tono(1450,.16,.15,.30)}
 function sonidoDuplicado(){tono(650,.18,0,.32);tono(650,.18,.23,.32)}
 function sonidoError(){tono(260,.25,0,.38);tono(180,.30,.29,.38)}
 
+function obtenerIdLector(){
+  const clave="SEC86_ID_LECTOR";
+  let id=localStorage.getItem(clave);
+  if(!id){
+    const aleatorio=Math.random().toString(36).slice(2,6).toUpperCase();
+    const tiempo=Date.now().toString(36).slice(-4).toUpperCase();
+    id="LECTOR-"+aleatorio+tiempo;
+    localStorage.setItem(clave,id);
+  }
+  return id;
+}
+
+const ID_LECTOR=obtenerIdLector();
+
+window.addEventListener("DOMContentLoaded",function(){
+  const e=document.getElementById("idLector");
+  if(e)e.innerText=ID_LECTOR;
+});
+
 async function iniciar(){
   prepararAudio();
   document.getElementById("boton").disabled=true;
@@ -109,7 +123,7 @@ function qrDetectado(codigo){
   consultar(codigo);
 }
 function consultar(codigo){
-  const dispositivo=document.getElementById("dispositivo").value;
+  const dispositivo=ID_LECTOR;
   const callback="cb_"+Date.now()+"_"+Math.floor(Math.random()*10000);
   const script=document.createElement("script");
   let terminado=false;
@@ -117,8 +131,8 @@ function consultar(codigo){
     if(terminado)return; terminado=true;
     try{delete window[callback]}catch(e){}
     script.remove();
-    mostrar({ok:false,tipo:"ERROR",mensaje:"SIN RESPUESTA DEL SERVIDOR"});
-  },8000);
+    mostrar({ok:false,tipo:"ERROR",mensaje:"SERVIDOR OCUPADO — NO REESCANEAR DE INMEDIATO"});
+  },15000);
 
   window[callback]=function(datos){
     if(terminado)return; terminado=true; clearTimeout(timeout);
@@ -150,7 +164,7 @@ function mostrar(datos){
     }
     document.getElementById("mensaje").innerText="ENTRADA REGISTRADA";
     sonidoOk(); vibrar([80]);
-  }else if(datos.tipo==="DUPLICADO"){
+  }else if(datos.tipo==="DUPLICADO" || datos.duplicado===true){
     caja.className="duplicado"; document.getElementById("icono").innerText="⚠️";
     document.getElementById("mensaje").innerText="ENTRADA YA REGISTRADA";
     sonidoDuplicado(); vibrar([160,70,160]);
