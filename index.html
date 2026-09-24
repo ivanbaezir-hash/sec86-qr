@@ -13,7 +13,9 @@ main{max-width:500px;margin:auto;padding:15px}
 .tarjeta{background:white;padding:15px;border-radius:14px;margin-bottom:15px;box-shadow:0 2px 8px #bbb}
 select,button{width:100%;padding:14px;font-size:17px;margin-top:8px;border-radius:8px}
 button{background:#173a5e;color:white;border:0;font-weight:bold}
-#resultado{display:none;padding:20px;border-radius:14px;margin-top:15px}
+#reader{width:100%;max-width:360px;margin:0 auto}
+#reader video{max-height:300px!important;object-fit:cover}
+#resultado{display:none;padding:16px;border-radius:14px;position:fixed;left:10px;right:10px;top:10px;z-index:9999;max-width:460px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.28)}
 .ok{background:#dcfce7;border:3px solid #16a34a}
 .retardo{background:#fef3c7;border:3px solid #d97706}
 .duplicado{background:#ffedd5;border:3px solid #ea580c}
@@ -60,20 +62,27 @@ function prepararAudio(){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
     if(audioCtx.state==="suspended") audioCtx.resume();
+    // Sonido silencioso durante el toque para desbloquear audio móvil.
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    g.gain.value=0.0001; o.connect(g); g.connect(audioCtx.destination);
+    o.start(); o.stop(audioCtx.currentTime+0.03);
   }catch(e){}
 }
-function tono(freq,duracion,inicio=0){
-  if(!audioCtx) return;
-  const o=audioCtx.createOscillator(), g=audioCtx.createGain();
-  o.frequency.value=freq; o.type="sine";
-  g.gain.setValueAtTime(0.12,audioCtx.currentTime+inicio);
-  g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+inicio+duracion);
-  o.connect(g); g.connect(audioCtx.destination);
-  o.start(audioCtx.currentTime+inicio); o.stop(audioCtx.currentTime+inicio+duracion);
+function tono(freq,duracion,inicio=0,vol=0.35){
+  try{
+    if(!audioCtx) prepararAudio();
+    if(audioCtx.state==="suspended") audioCtx.resume();
+    const o=audioCtx.createOscillator(), g=audioCtx.createGain();
+    o.frequency.value=freq; o.type="square";
+    g.gain.setValueAtTime(vol,audioCtx.currentTime+inicio);
+    g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+inicio+duracion);
+    o.connect(g); g.connect(audioCtx.destination);
+    o.start(audioCtx.currentTime+inicio); o.stop(audioCtx.currentTime+inicio+duracion);
+  }catch(e){}
 }
-function sonidoOk(){tono(1050,.11);tono(1450,.12,.13)}
-function sonidoDuplicado(){tono(700,.16);tono(700,.16,.20)}
-function sonidoError(){tono(260,.22);tono(190,.28,.25)}
+function sonidoOk(){tono(950,.13,0,.30);tono(1450,.16,.15,.30)}
+function sonidoDuplicado(){tono(650,.18,0,.32);tono(650,.18,.23,.32)}
+function sonidoError(){tono(260,.25,0,.38);tono(180,.30,.29,.38)}
 
 async function iniciar(){
   prepararAudio();
@@ -81,7 +90,7 @@ async function iniciar(){
   document.getElementById("mensajeCamara").innerText="Solicitando acceso a la cámara...";
   scanner=new Html5Qrcode("reader");
   try{
-    await scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:250,height:250}},qrDetectado);
+    await scanner.start({facingMode:"environment"},{fps:15,qrbox:{width:220,height:220},aspectRatio:1.333333},qrDetectado);
     document.getElementById("boton").style.display="none";
     document.getElementById("mensajeCamara").innerText="🟢 LECTOR ACTIVO — ACERQUE LA CREDENCIAL";
   }catch(error){
@@ -96,7 +105,7 @@ function qrDetectado(codigo){
   const ahora=Date.now();
   if(codigo===ultimo && ahora-ultimoTiempo<5000) return;
   ultimo=codigo; ultimoTiempo=ahora; procesando=true;
-  document.getElementById("mensajeCamara").innerText="Consultando credencial...";
+  document.getElementById("mensajeCamara").innerText="🔎 QR LEÍDO — VALIDANDO...";
   consultar(codigo);
 }
 function consultar(codigo){
